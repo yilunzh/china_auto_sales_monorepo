@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "China Auto Sales Data Analysis Monorepo",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "npm-run-all --parallel dev:frontend dev:backend",
+    "dev:frontend": "cd packages/frontend && npm run dev",
+    "dev:backend": "cd packages/backend && python -m src.api.main",
+    "build": "cd packages/frontend && npm install && npm run build"
   }
 }

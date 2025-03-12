@@ -1,6 +1,12 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm install && npm run build",
-  "outputDirectory": ".next",
-  "installCommand": "npm install"
+  "buildCommand": "cd packages/frontend && npm install tailwindcss postcss autoprefixer && npm run build",
+  "outputDirectory": "packages/frontend/.next",
+  "installCommand": "npm install",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/packages/frontend/$1"
+    }
+  ]
 } 
