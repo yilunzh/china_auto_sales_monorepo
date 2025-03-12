@@ -4,9 +4,18 @@ import { executeSqlQuery, fetchSchemaMetadata } from '@/lib/supabase';
 import { OpenAIResponse } from '@/lib/types';
 
 export async function POST(request: Request) {
+  const startTime = performance.now();
+  console.log(`[TIMING] Chat request started at ${new Date().toISOString()}`);
+  
   try {
+    // Parse request
+    const parseStartTime = performance.now();
     const { question, chatHistory } = await request.json();
-
+    console.log(`[TIMING] Request parsing: ${performance.now() - parseStartTime}ms`);
+    
+    // Log initial processing time
+    const aiProcessingStartTime = performance.now();
+    
     if (!question) {
       return NextResponse.json(
         { error: 'Question is required' },
@@ -31,6 +40,9 @@ export async function POST(request: Request) {
     // If OpenAI provides a SQL query
     if (response.type === 'sql' && response.sqlQuery) {
       try {
+        // Add this line to define the variable before using it
+        const dbQueryStartTime = performance.now();
+        
         // Execute the SQL query against Supabase
         const { data, error } = await executeSqlQuery(response.sqlQuery);
 
@@ -88,6 +100,12 @@ export async function POST(request: Request) {
           }
         }
 
+        // After database query
+        console.log(`[TIMING] Database query: ${performance.now() - dbQueryStartTime}ms`);
+        
+        // Before final response preparation
+        const responsePreparationStartTime = performance.now();
+        
         return NextResponse.json({
           type: 'data',
           content: response.content,
@@ -121,12 +139,16 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   } catch (error: any) {
-    console.error('API route error:', error);
+    const errorTime = performance.now() - startTime;
+    console.error(`[TIMING] Error after ${errorTime}ms:`, error);
     return NextResponse.json(
       {
         type: 'error',
         content: 'Error processing your request',
         error: error.message || error.toString(),
+        _debug: {
+          processingTimeMs: errorTime
+        }
       },
       { status: 500 }
     );

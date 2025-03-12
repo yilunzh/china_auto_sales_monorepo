@@ -31,6 +31,9 @@ export default function ChatInterface() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const clientStartTime = performance.now();
+    console.log(`[CLIENT-TIMING] Starting chat submission at ${new Date().toISOString()}`);
+    
     if (!inputValue.trim() || isLoading) return;
     
     const userMessage: ChatMessage = {
@@ -76,7 +79,13 @@ export default function ChatInterface() {
         }),
       });
       
+      const apiResponseTime = performance.now();
+      console.log(`[CLIENT-TIMING] API response received after ${apiResponseTime - clientStartTime}ms`);
+      
       const data = await response.json();
+      
+      const jsonParseTime = performance.now();
+      console.log(`[CLIENT-TIMING] JSON parsing took ${jsonParseTime - apiResponseTime}ms`);
       
       // Update the assistant message based on the response
       setMessages(prev => 
@@ -115,6 +124,11 @@ export default function ChatInterface() {
           return msg;
         })
       );
+      
+      const uiUpdateTime = performance.now();
+      console.log(`[CLIENT-TIMING] UI update took ${uiUpdateTime - jsonParseTime}ms`);
+      console.log(`[CLIENT-TIMING] Total client-side processing: ${uiUpdateTime - clientStartTime}ms`);
+      
     } catch (error) {
       // Handle fetch errors
       setMessages(prev => 
@@ -131,6 +145,7 @@ export default function ChatInterface() {
           return msg;
         })
       );
+      console.error(`[CLIENT-TIMING] Error after ${performance.now() - clientStartTime}ms:`, error);
     } finally {
       setIsLoading(false);
     }

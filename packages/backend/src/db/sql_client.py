@@ -3,6 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional, Tuple
 from dotenv import load_dotenv
 import json
+import time
 
 # Import the existing Supabase client
 from .supabase_client import get_supabase_client
@@ -28,6 +29,9 @@ async def execute_sql_query(
         - List of column names in the order they appear in the query
         - Error message (if any)
     """
+    start_time = time.time()
+    print(f"[TIMING] Starting SQL execution at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    
     # Validate that this is a safe read-only query for security
     cleaned_query = query.strip().lower()
     
@@ -66,6 +70,10 @@ async def execute_sql_query(
         
         # Get Supabase client
         supabase = get_supabase_client()
+        
+        # Before actual database call
+        db_call_start = time.time()
+        print(f"[TIMING] DB call preparation took {(db_call_start - start_time) * 1000:.2f}ms")
         
         # Call the exec_sql RPC function
         try:
@@ -200,6 +208,19 @@ async def execute_sql_query(
                 data = ordered_data
                 
             print(f"Query returned {len(data)} rows")
+            
+            # After database call
+            db_call_end = time.time()
+            print(f"[TIMING] DB execution took {(db_call_end - db_call_start) * 1000:.2f}ms")
+            
+            # Before data processing
+            processing_start = time.time()
+            
+            # End timing
+            end_time = time.time()
+            print(f"[TIMING] Data processing took {(end_time - processing_start) * 1000:.2f}ms")
+            print(f"[TIMING] Total SQL query execution took {(end_time - start_time) * 1000:.2f}ms")
+            
             return data, columns, None
             
         except Exception as e:
@@ -209,5 +230,7 @@ async def execute_sql_query(
             return [], [], f"Error executing RPC: {str(e)}. Query: {formatted_query[:100]}{'...' if len(formatted_query) > 100 else ''}"
     
     except Exception as e:
+        error_time = time.time()
+        print(f"[TIMING] SQL error after {(error_time - start_time) * 1000:.2f}ms: {str(e)}")
         error_message = f"Error executing query: {str(e)}. Query: {query[:100]}{'...' if len(query) > 100 else ''}" + f"\n{traceback.format_exc()}"
         return [], [], error_message
