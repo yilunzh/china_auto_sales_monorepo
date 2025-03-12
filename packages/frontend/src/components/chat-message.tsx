@@ -47,6 +47,37 @@ function FormattedInsight({ insight }: { insight: string }) {
   );
 }
 
+// Add this helper function to format insights with proper bullet points
+function formatInsights(text: string): JSX.Element {
+  // Check if the text contains bullet points
+  if (text.includes('•') || text.includes('*') || text.includes('-')) {
+    // Split by bullet characters, keeping the bullet
+    const parts = text.split(/(?=(?:\s*[•*-]\s+))/);
+    
+    return (
+      <div className="space-y-2">
+        {parts.map((part, index) => {
+          // Clean up the part and check if it's a bullet point
+          const trimmed = part.trim();
+          if (trimmed.startsWith('•') || trimmed.startsWith('*') || trimmed.startsWith('-')) {
+            return (
+              <div key={index} className="flex">
+                <span className="mr-2">{trimmed.charAt(0)}</span>
+                <span>{trimmed.substring(1).trim()}</span>
+              </div>
+            );
+          }
+          // Return regular text for non-bullet parts
+          return <p key={index}>{trimmed}</p>;
+        })}
+      </div>
+    );
+  }
+  
+  // If no bullets, return the text as is
+  return <p>{text}</p>;
+}
+
 export function ChatMessageItem({ message, onModifyQuery }: ChatMessageProps) {
   const [modifiedQuerySuggestion, setModifiedQuerySuggestion] = useState('');
   const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
@@ -112,7 +143,12 @@ export function ChatMessageItem({ message, onModifyQuery }: ChatMessageProps) {
                   />
                   
                   {message.dataResult.insight && (
-                    <FormattedInsight insight={message.dataResult.insight} />
+                    <div className="mt-4">
+                      <h3 className="font-semibold text-gray-800 mb-2">Key Insights</h3>
+                      <div className="text-sm text-gray-700">
+                        {formatInsights(message.dataResult.insight)}
+                      </div>
+                    </div>
                   )}
                   
                   {message.dataResult.sqlQuery && (

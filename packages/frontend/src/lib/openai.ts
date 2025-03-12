@@ -134,7 +134,7 @@ export async function generateInsights({
   sqlQuery,
   insightTemplate,
 }: {
-  data: any;
+  data: any[];
   question: string;
   sqlQuery: string;
   insightTemplate: string;
@@ -167,7 +167,6 @@ export async function generateInsights({
       }
     };
     
-    // Use the full dataset for analysis
     const dataToAnalyze = data;
     const basicStats = Array.isArray(data) ? generateBasicStats(data) : { rowCount: 0 };
 
@@ -176,15 +175,12 @@ export async function generateInsights({
       console.warn(`Large dataset with ${data.length} rows being sent to OpenAI. This may cause issues with token limits.`);
     }
 
+    // Modify the prompt to explicitly request brevity
     const prompt = insightTemplate || `
-      Analyze this data thoroughly and provide concise, valuable insights about the results. 
-      Focus on meaningful patterns, significant trends, noteworthy anomalies, and important findings.
-      
-      Format your response using proper Markdown:
-      - Use # and ## for headings
-      - Use bullet points (*, -) for lists
-      - Use bold and italic for emphasis
-      - Use tables where appropriate using Markdown table syntax
+      Analyze this data and provide very concise insights in approximately 100 words maximum.
+      Focus only on the most important 4-5 findings.
+      Use bullet points for brevity.
+      Avoid unnecessary explanations and keep language minimal.
     `;
 
     const response = await openai.chat.completions.create({
@@ -192,32 +188,11 @@ export async function generateInsights({
       messages: [
         {
           role: 'system',
-          content: `You are an elite data analyst with exceptional insight into business and market trends.
-          Your analysis is thorough, insightful, and reveals non-obvious patterns in data.
-          
-          YOUR TASK:
-          Given a dataset, analyze it thoroughly and provide comprehensive insights.
-          Look for patterns, trends, outliers, and other meaningful observations.
-          
-          ANALYSIS APPROACH:
-          
-          1. Understand the data structure and context
-          2. Identify key patterns and relationships in the data
-          3. Highlight notable outliers or anomalies
-          4. Provide actionable insights relevant to the business question
-          
-          FORMAT GUIDELINES:
-          - Use proper Markdown formatting in your response
-          - Start with a level 1 heading (# ) for the main title
-          - Use level 2 headings (## ) for each section
-          - Use bullet points (* or -) for key insights
-          - Use bold (**text**) for important numbers or findings
-          - Use tables if they help organize numerical comparisons
-          - Include a brief "Summary" section at the end with key takeaways
-          
-          REMEMBER: Your analysis should be data-driven, comprehensive, and tailored to the specific dataset and question at hand.
-          Use proper Markdown formatting for clear and structured presentation.
-          `
+          content: `You are a data analyst who provides extremely concise insights.
+          Your analysis must be under 100 words total.
+          Focus on just 4-5 key findings. If time series data is involved, focus on trends with bias towards the most recent data.
+          Use bullet points and minimal language.
+          Be direct and avoid unnecessary explanations.`
         },
         {
           role: 'user',
@@ -226,13 +201,12 @@ export async function generateInsights({
           
           It was in response to this question: "${question}"
           
-          Here is the complete dataset from the query (${basicStats.rowCount} total rows):
+          Here is the dataset from the query (${basicStats.rowCount} total rows):
           ${JSON.stringify(dataToAnalyze, null, 2)}
           
           ${prompt}
           
-          Please analyze this complete dataset and provide in-depth insights that would be truly valuable to a business user.
-          Focus on the most significant patterns and actionable findings.
+          Remember: Keep your response under 100 words total.
           `
         }
       ]

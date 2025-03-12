@@ -9,6 +9,37 @@ import { generateId } from '../lib/utils';
 import { Card } from './ui/card';
 import { Separator } from './ui/separator';
 
+// Helper function for fetch with timeout with improved error handling
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 30000) => {
+  try {
+    const controller = new AbortController();
+    const { signal } = controller;
+    
+    // Create a timeout promise that rejects
+    const timeoutPromise = new Promise<Response>((_, reject) => {
+      const id = setTimeout(() => {
+        clearTimeout(id);
+        const timeoutError = new Error(`Request timed out after ${timeoutMs}ms`);
+        timeoutError.name = 'TimeoutError'; // Add custom error type
+        reject(timeoutError);
+      }, timeoutMs);
+    });
+    
+    // Race between the fetch and the timeout
+    const response = await Promise.race([
+      fetch(url, { ...options, signal }),
+      timeoutPromise
+    ]);
+    
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      console.warn(`API call to ${url} timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+};
+
 export default function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -31,23 +62,19 @@ export default function ChatInterface() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const clientStartTime = performance.now();
-    console.log(`[CLIENT-TIMING] Starting chat submission at ${new Date().toISOString()}`);
-    
     if (!inputValue.trim() || isLoading) return;
     
+    // Add user message immediately
     const userMessage: ChatMessage = {
       id: generateId(),
       role: 'user',
       content: inputValue,
       createdAt: new Date(),
     };
-    
-    // Add user message
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     
-    // Create a placeholder for the assistant's response
+    // Create temporary placeholder message
     const assistantMessageId = generateId();
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
@@ -59,93 +86,119 @@ export default function ChatInterface() {
     
     setMessages(prev => [...prev, assistantMessage]);
     setIsLoading(true);
-    
+
     try {
-      // Format chat history for the API
-      const chatHistory = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-      
-      // Call the API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // STEP 1: Generate SQL query with timeout
+      const queryResponse = await fetchWithTimeout(
+        '/api/chat/generate-query', 
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            question: userMessage.content,
+            chatHistory: messages.map(msg => ({
+              role: msg.role,
+              content: msg.content
+            })).slice(-6)
+          })
         },
-        body: JSON.stringify({
-          question: userMessage.content,
-          chatHistory,
-        }),
-      });
+        30000 // 30 second timeout
+      );
       
-      const apiResponseTime = performance.now();
-      console.log(`[CLIENT-TIMING] API response received after ${apiResponseTime - clientStartTime}ms`);
+      if (!queryResponse.ok) throw new Error('Failed to generate query');
+      const queryData = await queryResponse.json();
       
-      const data = await response.json();
+      // Update message with preliminary response
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === assistantMessageId 
+            ? { ...msg, content: 'Generating SQL query...' } 
+            : msg
+        )
+      );
       
-      const jsonParseTime = performance.now();
-      console.log(`[CLIENT-TIMING] JSON parsing took ${jsonParseTime - apiResponseTime}ms`);
+      // STEP 2: Execute SQL with timeout
+      const sqlResponse = await fetchWithTimeout(
+        '/api/chat/execute-query',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sqlQuery: queryData.sqlQuery })
+        },
+        30000
+      );
       
-      // Update the assistant message based on the response
-      setMessages(prev => 
-        prev.map(msg => {
-          if (msg.id === assistantMessageId) {
-            if (data.type === 'follow_up') {
-              return {
-                ...msg,
-                content: data.content,
+      if (!sqlResponse.ok) throw new Error('Failed to execute query');
+      const sqlData = await sqlResponse.json();
+      
+      // STEP 3: Generate insights with timeout (if needed)
+      let insightData = { insight: null };
+      
+      if (sqlData.data && sqlData.data.length > 0) {
+        const insightResponse = await fetchWithTimeout(
+          '/api/chat/generate-insight',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              data: sqlData.data,
+              sqlQuery: queryData.sqlQuery,
+              question: userMessage.content
+            })
+          },
+          30000
+        );
+        
+        if (insightResponse.ok) {
+          insightData = await insightResponse.json();
+        }
+      }
+      
+      // Update final message with complete data
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === assistantMessageId 
+            ? { 
+                ...msg, 
                 isLoading: false,
-              };
-            } else if (data.type === 'data') {
-              return {
-                ...msg,
-                content: data.content,
-                isLoading: false,
+                content: queryData.content || 'Here are the results:',
                 dataResult: {
-                  data: data.data,
-                  displayType: data.displayType,
-                  insight: data.insight,
-                  sqlQuery: data.sqlQuery,
-                  reasoning: data.reasoning,
-                  column_order: data.column_order,
-                },
-              };
-            } else if (data.type === 'error') {
-              return {
-                ...msg,
-                content: data.content,
+                  data: sqlData.data || [],
+                  sqlQuery: queryData.sqlQuery,
+                  displayType: sqlData.displayType || 'table',
+                  insight: insightData.insight || null
+                }
+              } 
+            : msg
+        )
+      );
+    } catch (error) {
+      console.error('Error processing chat:', error);
+      
+      let errorMessage = 'An error occurred';
+      
+      if (error instanceof Error) {
+        // Handle timeout specifically
+        if (error.name === 'TimeoutError') {
+          errorMessage = 'The request took too long to complete. Please try a simpler query or try again later.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      // Update message with error state
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === assistantMessageId 
+            ? { 
+                ...msg, 
                 isLoading: false,
                 isError: true,
-                errorMessage: data.error,
-              };
-            }
-          }
-          return msg;
-        })
+                errorMessage: errorMessage
+              } 
+            : msg
+        )
       );
-      
-      const uiUpdateTime = performance.now();
-      console.log(`[CLIENT-TIMING] UI update took ${uiUpdateTime - jsonParseTime}ms`);
-      console.log(`[CLIENT-TIMING] Total client-side processing: ${uiUpdateTime - clientStartTime}ms`);
-      
-    } catch (error) {
-      // Handle fetch errors
-      setMessages(prev => 
-        prev.map(msg => {
-          if (msg.id === assistantMessageId) {
-            return {
-              ...msg,
-              content: 'Sorry, there was an error processing your request.',
-              isLoading: false,
-              isError: true,
-              errorMessage: error instanceof Error ? error.message : 'Unknown error',
-            };
-          }
-          return msg;
-        })
-      );
-      console.error(`[CLIENT-TIMING] Error after ${performance.now() - clientStartTime}ms:`, error);
     } finally {
       setIsLoading(false);
     }
