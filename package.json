@@ -10,10 +10,9 @@
     "dev": "npm-run-all --parallel dev:frontend dev:backend-proxy",
     "dev:frontend": "cd packages/frontend && npm run dev",
     "dev:backend-proxy": "echo 'Backend proxy not configured yet'",
-    "build": "npm-run-all --parallel build:frontend build:backend-proxy",
-    "build:frontend": "cd packages/frontend && npm run build",
-    "build:backend-proxy": "echo 'Backend proxy build not configured yet'",
-    "dev:backend": "cd packages/backend && python -m src.api.main"
+    "build": "ls -la && find . -type d -name 'frontend' && cd packages/frontend && npm install && npm run build",
+    "dev:backend": "cd packages/backend && python -m src.api.main",
+    "build:frontend": "cd packages/frontend && npm install && npm run build"
   },
   "devDependencies": {
     "npm-run-all": "^4.1.5"
