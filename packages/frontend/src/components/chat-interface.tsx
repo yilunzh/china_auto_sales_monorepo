@@ -166,7 +166,7 @@ export default function ChatInterface() {
                   data: sqlData.data || [],
                   sqlQuery: queryData.sqlQuery,
                   displayType: sqlData.displayType || 'table',
-                  insight: insightData.insight || null
+                  insight: insightData.insight || undefined
                 }
               } 
             : msg

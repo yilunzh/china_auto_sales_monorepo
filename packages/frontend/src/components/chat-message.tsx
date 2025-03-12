@@ -48,7 +48,7 @@ function FormattedInsight({ insight }: { insight: string }) {
 }
 
 // Add this helper function to format insights with proper bullet points
-function formatInsights(text: string): JSX.Element {
+function formatInsights(text: string): React.ReactElement {
   // Check if the text contains bullet points
   if (text.includes('•') || text.includes('*') || text.includes('-')) {
     // Split by bullet characters, keeping the bullet
