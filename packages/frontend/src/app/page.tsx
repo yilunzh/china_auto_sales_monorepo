@@ -1,4 +1,5 @@
 import ChatInterface from '@/components/chat-interface';
+import { debugUtils } from '@/lib/debug';
 
 export default function Home() {
   return (
