@@ -20,10 +20,6 @@ app.include_router(scraper.router, prefix="/scraper", tags=["scraper"])
 app.include_router(jobs_router, prefix="/api")  # Add the jobs router
 app.include_router(sql.router, prefix="/sql", tags=["sql"])  # Add the SQL router
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
 def run_server():
     """Entry point for the application."""
     import uvicorn
