@@ -206,10 +206,10 @@ export default function ChatInterface() {
 
   // Example questions to help users get started
   const exampleQuestions = [
-    'What were the total sales of Tesla in 2020?',
-    'Which manufacturer sold the most cars in 2021?',
-    'Show me the monthly sales trend for Toyota in 2019',
-    'Compare sales of BMW and Mercedes in 2022',
+    'Give me the top 10 most sold models in 2024',
+    'aggregates monthly sales from 2018 til now for 小米汽车，蔚来汽车，理想汽车 and 小鹏汽车. returns a row for each year and month with the sales for each manufacturer in separate columns. use model_unit_sales for aggregating sales volume in each cell',
+    'Show me the monthly sales trend for 丰田 in 2019. fuzzy match on the manufacturer name',
+    'Compare sales of 宝马, 奔驰, 奥迪in each year between 2018 to 2024. fuzzy match on the manufacturer name. each row should be 1 year, each column should be each of the manufacturer'
   ];
 
   // Add a simplified query modification handler
@@ -352,12 +352,12 @@ export default function ChatInterface() {
       {messages.length <= 1 && (
         <Card className="mx-4 my-2 p-4">
           <h3 className="font-medium mb-2">Try asking:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             {exampleQuestions.map((question, i) => (
               <Button 
                 key={i} 
                 variant="outline" 
-                className="justify-start h-auto py-2 px-3 text-left"
+                className="justify-start h-auto py-2 px-3 text-left whitespace-normal break-words"
                 onClick={() => {
                   setInputValue(question);
                 }}
